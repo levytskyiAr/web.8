@@ -1,5 +1,6 @@
 from mongoengine import Document, StringField, ReferenceField, ListField, connect
 import json
+from mongoengine.errors import NotUniqueError
 
 class Author(Document):
     fullname = StringField(required=True)
@@ -20,21 +21,22 @@ def load_data_to_database():
 
     # Завантаження авторів
     with open('C:\\Projects\\web.8\\first_task\\authors.json', 'r', encoding='utf-8') as file:
-        authors_data = json.load(file)
-        for author_data in authors_data:
-            Author(**author_data).save()
+        data = json.load(file)
+        for el in data:
+            try:
+                author = Author(fullname=el.get('fullname'), born_date=el.get('born_date'),
+                                born_location=el.get('born_location'), description=el.get('description'))
+                author.save()
+            except NotUniqueError:
+                print(f"Автор вже існує {el.get('fullname')}")
 
     # Завантаження цитат
     with open('C:\\Projects\\web.8\\first_task\\quotes.json', 'r', encoding='utf-8') as file:
-        quotes_data = json.load(file)
-        for quote_data in quotes_data:
-            author_name = quote_data.pop('author')
-            author = Author.objects.filter(fullname=author_name).first()
-            if author is not None:
-                quote_data['author'] = author
-                Quote(**quote_data).save()
-            else:
-                print(f"Автор з ім'ям '{author_name}' не знайдений.")
+        data = json.load(file)
+        for el in data:
+            author, *_ = Author.objects(fullname=el.get('author'))
+            quote = Quote(quote=el.get('quote'), tags=el.get('tags'), author=author)
+            quote.save()
 
 def search_quotes():
     while True:
@@ -45,19 +47,19 @@ def search_quotes():
             author = Author.objects.get(fullname=author_name)
             quotes = Quote.objects(author=author)
             for quote in quotes:
-                print(quote)
+                print((f"Автор: {quote.author.fullname}, Цитата: {quote.quote}"))
 
         elif command.startswith("tag:"):
             tag = command.split(":")[1].strip()
             quotes = Quote.objects(tags=tag)
             for quote in quotes:
-                print(quote)
+                print(f"Теги: {tag}, Цитата: {quote.quote}")
 
         elif command.startswith("tags:"):
             tags = command.split(":")[1].strip().split(",")
             quotes = Quote.objects(tags__in=tags)
             for quote in quotes:
-                print(quote)
+                print(f"Теги: {tags}, Цитата: {quote.quote}")
 
         elif command == "exit":
             break
